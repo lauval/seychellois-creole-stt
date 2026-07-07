@@ -16,13 +16,13 @@ uv sync
 
 ```bash
 # 1. Download video from YouTube
-uv run python scripts/01_download.py "https://www.youtube.com/watch?v=VIDEO_ID"
+uv run python scripts/download.py "https://www.youtube.com/watch?v=VIDEO_ID"
 
 # 2. Extract 16kHz mono WAV audio
-uv run python scripts/02_extract_audio.py data/raw/video/filename.mp4
+uv run python scripts/extract_audio.py data/raw/video/filename.mp4
 
 # 3. Transcribe and align (outputs JSON + timestamped text)
-uv run python scripts/03_align.py data/raw/audio/filename.wav
+uv run python scripts/align.py data/raw/audio/filename.wav
 ```
 
 ## Target session
@@ -35,6 +35,6 @@ Selected for dense code-switching between Kreol Seselwa and English
 
 ## Notes
 
-- WhisperX uses `fr` (French) as the closest supported language proxy for Kreol Seselwa
+- WhisperX transcribes with `ht` (Haitian Creole) as the closest proxy for Kreol Seselwa, with `fr` (French) for alignment (no alignment model exists for Haitian Creole)
 - Runs on CPU — WhisperX has documented MPS compatibility issues on Apple Silicon
 - Aligned output goes to `data/aligned/`; manually corrected ground truth goes to `data/ground_truth/`

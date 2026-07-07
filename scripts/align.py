@@ -9,10 +9,10 @@ import whisperx
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "aligned"
 
-# MPS has documented broadcast-compatibility crashes with WhisperX on Apple Silicon.
-# CPU is the safe choice for both transcription and alignment.
 DEVICE = "cpu"
 COMPUTE_TYPE = "int8"
+TRANSCRIBE_LANG = "ht"
+ALIGN_LANG = "fr"
 
 
 def format_timestamp(seconds: float) -> str:
@@ -37,12 +37,12 @@ def main():
     # Load audio
     audio = whisperx.load_audio(str(audio_path))
 
-    # Transcribe with large-v2, forcing French as closest proxy for Kreol Seselwa
-    model = whisperx.load_model("large-v2", DEVICE, compute_type=COMPUTE_TYPE, language="fr")
-    result = model.transcribe(audio, language="fr", batch_size=8)
+    # Transcribe with large-v2, using Haitian Creole as closest proxy for Kreol Seselwa
+    model = whisperx.load_model("large-v2", DEVICE, compute_type=COMPUTE_TYPE, language=TRANSCRIBE_LANG)
+    result = model.transcribe(audio, language=TRANSCRIBE_LANG, batch_size=8)
 
-    # Align to get word-level timestamps
-    align_model, metadata = whisperx.load_align_model(language_code="fr", device=DEVICE)
+    # Align with French (no alignment model exists for Haitian Creole)
+    align_model, metadata = whisperx.load_align_model(language_code=ALIGN_LANG, device=DEVICE)
     result = whisperx.align(
         result["segments"], align_model, metadata, audio, DEVICE, return_char_alignments=False
     )
