@@ -25,14 +25,21 @@ def main():
         args.url,
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd)
     if result.returncode != 0:
-        print(result.stderr, file=sys.stderr)
         sys.exit(1)
 
-    # The last non-empty line of stdout is the final file path
-    output_path = result.stdout.strip().splitlines()[-1]
-    print(output_path)
+    # Resolve the actual output file, ignoring partial downloads
+    files = sorted(
+        [f for f in OUTPUT_DIR.glob("*") if not f.name.endswith(".part")],
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )
+    if not files:
+        print("Error: download failed — no completed file found in output directory", file=sys.stderr)
+        sys.exit(1)
+
+    print(files[0])
 
 
 if __name__ == "__main__":

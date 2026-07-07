@@ -25,6 +25,8 @@ def main():
 
     parser = argparse.ArgumentParser(description="Extract audio from a video file")
     parser.add_argument("video", help="Path to the input video file")
+    parser.add_argument("--start", help="Start timestamp, e.g. 10:37 or 1:02:30")
+    parser.add_argument("--end", help="End timestamp, e.g. 1:30:00")
     args = parser.parse_args()
 
     video_path = Path(args.video)
@@ -35,15 +37,13 @@ def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / f"{video_path.stem}.wav"
 
-    # Convert to 16kHz mono WAV
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", str(video_path),
-        "-ac", "1",
-        "-ar", "16000",
-        "-sample_fmt", "s16",
-        str(output_path),
-    ]
+    cmd = ["ffmpeg", "-y"]
+    if args.start:
+        cmd += ["-ss", args.start]
+    cmd += ["-i", str(video_path)]
+    if args.end:
+        cmd += ["-to", args.end]
+    cmd += ["-ac", "1", "-ar", "16000", "-sample_fmt", "s16", str(output_path)]
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
