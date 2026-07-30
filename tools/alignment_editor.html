@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alignment Editor</title>
+<style>
+:root {
+  --ground: #F5F4F0;
+  --surface: #EDECEA;
+  --surface-raised: #fff;
+  --text: #2C2C2E;
+  --text-muted: #807B73;
+  --accent: #3B6E5E;
+  --accent-fg: #fff;
+  --accent-soft: rgba(59, 110, 94, 0.08);
+  --playing: #C07030;
+  --playing-bg: rgba(192, 112, 48, 0.07);
+  --playing-border: #C07030;
+  --border: #D0CEC8;
+  --input-bg: #fff;
+  --input-border: #C8C6C0;
+  --focus-ring: rgba(59, 110, 94, 0.35);
+  --mono: 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --body: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: Georgia, 'Times New Roman', serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #18181C;
+    --surface: #222228;
+    --surface-raised: #2A2A30;
+    --text: #D5D3CC;
+    --text-muted: #85827A;
+    --accent: #62A892;
+    --accent-fg: #18181C;
+    --accent-soft: rgba(98, 168, 146, 0.08);
+    --playing: #D48B4A;
+    --playing-bg: rgba(212, 139, 74, 0.09);
+    --playing-border: #D48B4A;
+    --border: #38383E;
+    --input-bg: #2A2A30;
+    --input-border: #44444A;
+    --focus-ring: rgba(98, 168, 146, 0.3);
+  }
+}
+
+* { box-sizing: border-box; margin: 0; }
+
+body {
+  font-family: var(--body);
+  background: var(--ground);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* -- LANDING -- */
+#landing {
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 40px 20px;
+  text-align: center;
+}
+#landing h1 {
+  font-family: var(--display);
+  font-size: 1.6rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+#landing p {
+  color: var(--text-muted);
+  max-width: 380px;
+}
+.file-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 380px;
+}
+.file-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.file-label span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.file-label input[type="file"] {
+  font-family: var(--body);
+  font-size: 0.9rem;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+}
+.file-label input[type="file"]:hover {
+  border-color: var(--accent);
+}
+.landing-status {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  min-height: 1.4em;
+}
+.landing-status.ready { color: var(--accent); font-weight: 500; }
+
+/* -- EDITOR -- */
+#editor { display: none; flex-direction: column; height: 100vh; }
+#editor.active { display: flex; }
+
+/* toolbar */
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.toolbar-title {
+  font-family: var(--display);
+  font-size: 1rem;
+  white-space: nowrap;
+}
+.toolbar-progress {
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  background: var(--accent-soft);
+  padding: 2px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 280px;
+}
+.play-btn {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.1s;
+}
+.play-btn:hover { background: var(--accent); filter: brightness(1.1); }
+.play-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.time-display {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  min-width: 48px;
+  text-align: center;
+  white-space: nowrap;
+}
+.seekbar {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.seekbar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  cursor: pointer;
+}
+.seekbar::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  cursor: pointer;
+}
+
+.jump-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.jump-input {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  width: 80px;
+  padding: 5px 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  color: var(--text);
+}
+.jump-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--focus-ring); }
+.jump-input::placeholder { color: var(--text-muted); }
+
+.btn-sm {
+  font-family: var(--body);
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-accent {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.btn-accent:hover { filter: brightness(1.1); color: var(--accent-fg); }
+
+/* -- SEGMENT LIST -- */
+.seg-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 200px;
+}
+
+.seg {
+  display: grid;
+  grid-template-columns: 80px 1fr 28px;
+  gap: 6px 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+  align-items: start;
+}
+.seg:hover { background: var(--accent-soft); }
+.seg.playing {
+  background: var(--playing-bg);
+  border-left-color: var(--playing-border);
+}
+.seg.edited .seg-check { opacity: 1; }
+
+.seg-gutter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 2px;
+}
+.seg-time {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.3;
+}
+.seg-time:hover { text-decoration: underline; }
+.seg-time:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 2px; }
+.seg-dur {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+}
+
+.seg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.seg-ht {
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+  transition: white-space 0.15s, max-height 0.15s;
+  max-height: 1.4em;
+}
+.seg-ht.expanded {
+  white-space: normal;
+  max-height: 200px;
+}
+.seg-text {
+  width: 100%;
+  font-family: var(--body);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  resize: none;
+  overflow: hidden;
+  transition: border-color 0.1s, background 0.1s;
+  min-height: 2em;
+}
+.seg-text:hover { border-color: var(--input-border); }
+.seg-text:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--input-bg);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.seg-check {
+  font-size: 0.85rem;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding-top: 4px;
+  text-align: center;
+}
+
+/* number badge */
+.seg-num {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+}
+
+@media (max-width: 600px) {
+  .seg { grid-template-columns: 64px 1fr 24px; padding: 8px 12px; }
+  .toolbar { padding: 8px 12px; gap: 10px; }
+  .player { min-width: 200px; }
+}
+
+/* keyboard hint */
+.kbd-hint {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  opacity: 0.7;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<!-- LANDING -->
+<div id="landing">
+  <h1>Alignment Editor</h1>
+  <p>Load your audio file and the alignment JSON to start reviewing and editing segment text.</p>
+  <div class="file-group">
+    <label class="file-label">
+      <span>Audio file</span>
+      <input type="file" id="audioInput" accept="audio/*,.wav,.mp3,.ogg,.flac">
+    </label>
+    <label class="file-label">
+      <span>Alignment JSON</span>
+      <input type="file" id="jsonInput" accept=".json">
+    </label>
+  </div>
+  <div class="landing-status" id="landingStatus"></div>
+</div>
+
+<!-- EDITOR -->
+<div id="editor">
+  <div class="toolbar">
+    <span class="toolbar-title">Alignment Editor</span>
+    <span class="toolbar-progress" id="progress">0 / 0 edited</span>
+    <div class="player">
+      <button class="play-btn" id="playBtn" title="Play / Pause (Space)">&#9654;</button>
+      <span class="time-display" id="curTime">0:00</span>
+      <input class="seekbar" type="range" id="seekbar" min="0" max="1000" value="0" step="0.1">
+      <span class="time-display" id="totTime">0:00</span>
+    </div>
+    <div class="jump-group">
+      <input class="jump-input" id="jumpInput" type="text" placeholder="mm:ss">
+      <button class="btn-sm" onclick="jumpToInput()">Go</button>
+    </div>
+    <button class="btn-sm btn-accent" id="exportBtn" onclick="exportJSON()">Export JSON</button>
+  </div>
+  <div class="seg-list" id="segList"></div>
+</div>
+
+<audio id="audio" preload="auto"></audio>
+
+<div class="kbd-hint" id="kbdHint">Space: play/pause &middot; Ctrl+&darr;/&uarr;: next/prev segment</div>
+
+<script>
+const state = {
+  segments: [],
+  originals: [],
+  currentIdx: -1,
+  audioLoaded: false,
+  jsonLoaded: false,
+};
+
+const audio = document.getElementById('audio');
+
+/* -- FORMAT -- */
+function fmt(sec) {
+  if (sec == null || isNaN(sec)) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m + ':' + s.toFixed(1).padStart(4, '0');
+}
+function fmtShort(sec) {
+  if (sec == null || isNaN(sec)) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return m + ':' + String(s).padStart(2, '0');
+}
+function parseTime(str) {
+  str = str.trim();
+  if (/^\d+(\.\d+)?$/.test(str)) return parseFloat(str);
+  const parts = str.split(':').map(Number);
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return NaN;
+}
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/* -- FILE LOADING -- */
+document.getElementById('audioInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  audio.src = URL.createObjectURL(file);
+  state.audioLoaded = true;
+  updateLanding();
+});
+document.getElementById('jsonInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    state.segments = JSON.parse(ev.target.result);
+    state.originals = state.segments.map(s => (s.text || '').trim());
+    state.jsonLoaded = true;
+    updateLanding();
+  };
+  reader.readAsText(file);
+});
+
+function updateLanding() {
+  const el = document.getElementById('landingStatus');
+  const parts = [];
+  if (state.audioLoaded) parts.push('Audio loaded');
+  if (state.jsonLoaded) parts.push(state.segments.length + ' segments loaded');
+  el.textContent = parts.join(' · ');
+  el.className = 'landing-status' + (state.audioLoaded && state.jsonLoaded ? ' ready' : '');
+
+  if (state.audioLoaded && state.jsonLoaded) {
+    setTimeout(enterEditor, 300);
+  }
+}
+
+/* -- EDITOR -- */
+function enterEditor() {
+  document.getElementById('landing').style.display = 'none';
+  document.getElementById('editor').classList.add('active');
+  renderSegments();
+  updateProgress();
+}
+
+function renderSegments() {
+  const list = document.getElementById('segList');
+  const html = state.segments.map((seg, i) => {
+    const text = (seg.text || '').trim();
+    const dur = (seg.end - seg.start).toFixed(1);
+    return `<div class="seg" id="seg-${i}">
+      <div class="seg-gutter">
+        <button class="seg-time" data-jump="${i}">${fmt(seg.start)}</button>
+        <span class="seg-dur">${dur}s</span>
+        <span class="seg-num">#${i + 1}</span>
+      </div>
+      <div class="seg-body">
+        <div class="seg-ht" data-idx="${i}" title="Click to expand original">${escHtml(text)}</div>
+        <textarea class="seg-text" data-idx="${i}" rows="1">${escHtml(text)}</textarea>
+      </div>
+      <div class="seg-check" id="chk-${i}">&#10003;</div>
+    </div>`;
+  }).join('');
+  list.innerHTML = html;
+
+  list.addEventListener('click', e => {
+    const jumpBtn = e.target.closest('[data-jump]');
+    if (jumpBtn) {
+      const idx = parseInt(jumpBtn.dataset.jump);
+      jumpTo(idx);
+      return;
+    }
+    const htEl = e.target.closest('.seg-ht');
+    if (htEl) {
+      htEl.classList.toggle('expanded');
+    }
+  });
+
+  list.addEventListener('input', e => {
+    if (e.target.classList.contains('seg-text')) {
+      autoSize(e.target);
+      const idx = parseInt(e.target.dataset.idx);
+      state.segments[idx].text = e.target.value;
+      updateSegStatus(idx);
+      updateProgress();
+    }
+  });
+
+  list.addEventListener('focus', e => {
+    if (e.target.classList.contains('seg-text')) {
+      const idx = parseInt(e.target.dataset.idx);
+      const segEl = document.getElementById('seg-' + idx);
+      if (segEl) segEl.classList.add('focus');
+    }
+  }, true);
+  list.addEventListener('blur', e => {
+    if (e.target.classList.contains('seg-text')) {
+      const idx = parseInt(e.target.dataset.idx);
+      const segEl = document.getElementById('seg-' + idx);
+      if (segEl) segEl.classList.remove('focus');
+    }
+  }, true);
+
+  requestAnimationFrame(() => {
+    list.querySelectorAll('.seg-text').forEach(autoSize);
+  });
+}
+
+function autoSize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.max(el.scrollHeight, 28) + 'px';
+}
+
+function updateSegStatus(idx) {
+  const cur = (state.segments[idx].text || '').trim();
+  const orig = state.originals[idx];
+  const edited = cur !== orig;
+  const segEl = document.getElementById('seg-' + idx);
+  if (segEl) segEl.classList.toggle('edited', edited);
+}
+
+function updateProgress() {
+  let count = 0;
+  for (let i = 0; i < state.segments.length; i++) {
+    if ((state.segments[i].text || '').trim() !== state.originals[i]) count++;
+  }
+  document.getElementById('progress').textContent = count + ' / ' + state.segments.length + ' edited';
+}
+
+/* -- AUDIO -- */
+function jumpTo(idx) {
+  if (idx < 0 || idx >= state.segments.length) return;
+  audio.currentTime = state.segments[idx].start;
+  audio.play();
+  highlightSeg(idx);
+  const el = document.getElementById('seg-' + idx);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function jumpToInput() {
+  const val = document.getElementById('jumpInput').value;
+  const t = parseTime(val);
+  if (!isNaN(t)) {
+    audio.currentTime = Math.max(0, Math.min(t, audio.duration || t));
+    audio.play();
+  }
+}
+document.getElementById('jumpInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); jumpToInput(); }
+});
+
+document.getElementById('playBtn').addEventListener('click', togglePlay);
+
+function togglePlay() {
+  if (audio.paused) { audio.play(); }
+  else { audio.pause(); }
+}
+
+audio.addEventListener('play', () => {
+  document.getElementById('playBtn').innerHTML = '&#9646;&#9646;';
+});
+audio.addEventListener('pause', () => {
+  document.getElementById('playBtn').innerHTML = '&#9654;';
+});
+audio.addEventListener('loadedmetadata', () => {
+  document.getElementById('totTime').textContent = fmtShort(audio.duration);
+  document.getElementById('seekbar').max = Math.floor(audio.duration * 10);
+});
+audio.addEventListener('timeupdate', () => {
+  document.getElementById('curTime').textContent = fmtShort(audio.currentTime);
+  const bar = document.getElementById('seekbar');
+  bar.value = audio.currentTime * 10;
+
+  const t = audio.currentTime;
+  let idx = -1;
+  for (let i = 0; i < state.segments.length; i++) {
+    if (t >= state.segments[i].start && t < state.segments[i].end) { idx = i; break; }
+  }
+  if (idx !== state.currentIdx) {
+    highlightSeg(idx);
+  }
+});
+
+document.getElementById('seekbar').addEventListener('input', e => {
+  audio.currentTime = e.target.value / 10;
+});
+
+function highlightSeg(idx) {
+  if (state.currentIdx >= 0) {
+    const prev = document.getElementById('seg-' + state.currentIdx);
+    if (prev) prev.classList.remove('playing');
+  }
+  state.currentIdx = idx;
+  if (idx >= 0) {
+    const el = document.getElementById('seg-' + idx);
+    if (el) {
+      el.classList.add('playing');
+      if (!document.activeElement || !document.activeElement.classList.contains('seg-text')) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }
+}
+
+/* -- EXPORT -- */
+function exportJSON() {
+  const out = state.segments.map((seg, i) => {
+    const obj = { start: seg.start, end: seg.end, text: seg.text };
+    if (seg.words) obj.words = seg.words;
+    if (seg.speaker) obj.speaker = seg.speaker;
+    return obj;
+  });
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'alignment_edited.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* -- KEYBOARD -- */
+document.addEventListener('keydown', e => {
+  const inText = document.activeElement && document.activeElement.tagName === 'TEXTAREA';
+  const inInput = document.activeElement && document.activeElement.tagName === 'INPUT';
+
+  if (e.code === 'Space' && !inText && !inInput) {
+    e.preventDefault();
+    togglePlay();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowDown') {
+    e.preventDefault();
+    const next = state.currentIdx + 1;
+    if (next < state.segments.length) jumpTo(next);
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowUp') {
+    e.preventDefault();
+    const prev = state.currentIdx - 1;
+    if (prev >= 0) jumpTo(prev);
+  }
+  if (e.key === 'Escape' && inText) {
+    document.activeElement.blur();
+  }
+});
+
+setTimeout(() => {
+  const hint = document.getElementById('kbdHint');
+  if (hint) { hint.style.transition = 'opacity 0.5s'; hint.style.opacity = '0'; setTimeout(() => hint.remove(), 600); }
+}, 8000);
+</script>
+
+</body>
+</html>

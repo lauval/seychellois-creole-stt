@@ -37,17 +37,16 @@ def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / f"{video_path.stem}.wav"
 
-    cmd = ["ffmpeg", "-y"]
+    cmd = ["ffmpeg", "-y", "-i", str(video_path)]
     if args.start:
         cmd += ["-ss", args.start]
-    cmd += ["-i", str(video_path)]
     if args.end:
         cmd += ["-to", args.end]
     cmd += ["-ac", "1", "-ar", "16000", "-sample_fmt", "s16", str(output_path)]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    print(f"Extracting audio to {output_path} ...")
+    result = subprocess.run(cmd)
     if result.returncode != 0:
-        print(result.stderr, file=sys.stderr)
         sys.exit(1)
 
     print(output_path)
