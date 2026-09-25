@@ -253,7 +253,7 @@ body {
 
 .seg {
   display: grid;
-  grid-template-columns: 80px 1fr 28px;
+  grid-template-columns: 168px minmax(0, 1fr) 28px;
   gap: 6px 10px;
   padding: 10px 20px;
   border-bottom: 1px solid var(--border);
@@ -293,6 +293,58 @@ body {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   font-family: var(--mono);
+}
+.time-edit {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+.time-row {
+  display: grid;
+  grid-template-columns: 14px minmax(86px, 1fr) 24px 24px;
+  gap: 4px;
+  align-items: center;
+}
+.time-label {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  text-transform: uppercase;
+}
+.time-input {
+  min-width: 0;
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 4px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  color: var(--text);
+}
+.time-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+.time-nudge {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.time-nudge:hover { border-color: var(--accent); color: var(--accent); }
+.time-error {
+  border-color: var(--playing-border);
+  box-shadow: 0 0 0 2px rgba(192, 112, 48, 0.18);
 }
 
 .seg-body {
@@ -358,7 +410,7 @@ body {
 }
 
 @media (max-width: 600px) {
-  .seg { grid-template-columns: 64px 1fr 24px; padding: 8px 12px; }
+  .seg { grid-template-columns: 156px minmax(0, 1fr) 24px; padding: 8px 10px; gap: 6px 8px; }
   .toolbar { padding: 8px 12px; gap: 10px; }
   .player { min-width: 200px; }
 }
@@ -426,6 +478,7 @@ body {
 const state = {
   segments: [],
   originals: [],
+  originalBounds: [],
   currentIdx: -1,
   audioLoaded: false,
   jsonLoaded: false,
@@ -474,12 +527,23 @@ document.getElementById('jsonInput').addEventListener('change', e => {
   const reader = new FileReader();
   reader.onload = ev => {
     state.segments = JSON.parse(ev.target.result);
+    normalizeSegments();
     state.originals = state.segments.map(s => (s.text || '').trim());
+    state.originalBounds = state.segments.map(s => ({ start: s.start, end: s.end }));
     state.jsonLoaded = true;
     updateLanding();
   };
   reader.readAsText(file);
 });
+
+function normalizeSegments() {
+  state.segments = state.segments.map(seg => ({
+    ...seg,
+    start: Number(seg.start) || 0,
+    end: Number(seg.end) || 0,
+    text: seg.text || '',
+  }));
+}
 
 function updateLanding() {
   const el = document.getElementById('landingStatus');
@@ -512,6 +576,20 @@ function renderSegments() {
         <button class="seg-time" data-jump="${i}">${fmt(seg.start)}</button>
         <span class="seg-dur">${dur}s</span>
         <span class="seg-num">#${i + 1}</span>
+        <div class="time-edit" aria-label="Timing controls for segment ${i + 1}">
+          <div class="time-row">
+            <span class="time-label">S</span>
+            <input class="time-input" data-boundary="${i}" data-field="start" type="number" step="0.1" min="0" value="${seg.start.toFixed(2)}" title="Segment start time in seconds">
+            <button class="time-nudge" data-nudge="${i}" data-field="start" data-delta="-0.1" title="Move start earlier by 0.1 seconds">-</button>
+            <button class="time-nudge" data-nudge="${i}" data-field="start" data-delta="0.1" title="Move start later by 0.1 seconds">+</button>
+          </div>
+          <div class="time-row">
+            <span class="time-label">E</span>
+            <input class="time-input" data-boundary="${i}" data-field="end" type="number" step="0.1" min="0" value="${seg.end.toFixed(2)}" title="Segment end time in seconds">
+            <button class="time-nudge" data-nudge="${i}" data-field="end" data-delta="-0.1" title="Move end earlier by 0.1 seconds">-</button>
+            <button class="time-nudge" data-nudge="${i}" data-field="end" data-delta="0.1" title="Move end later by 0.1 seconds">+</button>
+          </div>
+        </div>
       </div>
       <div class="seg-body">
         <div class="seg-ht" data-idx="${i}" title="Click to expand original">${escHtml(text)}</div>
@@ -523,6 +601,14 @@ function renderSegments() {
   list.innerHTML = html;
 
   list.addEventListener('click', e => {
+    const nudgeBtn = e.target.closest('[data-nudge]');
+    if (nudgeBtn) {
+      const idx = parseInt(nudgeBtn.dataset.nudge);
+      const field = nudgeBtn.dataset.field;
+      const delta = parseFloat(nudgeBtn.dataset.delta);
+      setBoundary(idx, field, state.segments[idx][field] + delta);
+      return;
+    }
     const jumpBtn = e.target.closest('[data-jump]');
     if (jumpBtn) {
       const idx = parseInt(jumpBtn.dataset.jump);
@@ -542,6 +628,14 @@ function renderSegments() {
       state.segments[idx].text = e.target.value;
       updateSegStatus(idx);
       updateProgress();
+    }
+  });
+
+  list.addEventListener('change', e => {
+    if (e.target.classList.contains('time-input')) {
+      const idx = parseInt(e.target.dataset.boundary);
+      const field = e.target.dataset.field;
+      setBoundary(idx, field, parseFloat(e.target.value), { sourceInput: e.target });
     }
   });
 
@@ -573,7 +667,7 @@ function autoSize(el) {
 function updateSegStatus(idx) {
   const cur = (state.segments[idx].text || '').trim();
   const orig = state.originals[idx];
-  const edited = cur !== orig;
+  const edited = cur !== orig || boundsChanged(idx);
   const segEl = document.getElementById('seg-' + idx);
   if (segEl) segEl.classList.toggle('edited', edited);
 }
@@ -581,9 +675,63 @@ function updateSegStatus(idx) {
 function updateProgress() {
   let count = 0;
   for (let i = 0; i < state.segments.length; i++) {
-    if ((state.segments[i].text || '').trim() !== state.originals[i]) count++;
+    if ((state.segments[i].text || '').trim() !== state.originals[i] || boundsChanged(i)) count++;
   }
-  document.getElementById('progress').textContent = count + ' / ' + state.segments.length + ' edited';
+  document.getElementById('progress').textContent = count + ' / ' + state.segments.length + ' changed';
+}
+
+function boundsChanged(idx) {
+  const orig = state.originalBounds[idx];
+  if (!orig) return false;
+  return Math.abs(state.segments[idx].start - orig.start) > 0.005 ||
+    Math.abs(state.segments[idx].end - orig.end) > 0.005;
+}
+
+function setBoundary(idx, field, rawValue, opts = {}) {
+  if (idx < 0 || idx >= state.segments.length || !['start', 'end'].includes(field)) return;
+  const input = opts.sourceInput;
+  const value = Number(rawValue);
+  if (!Number.isFinite(value)) {
+    if (input) input.classList.add('time-error');
+    return;
+  }
+
+  const minDur = 0.05;
+  const seg = state.segments[idx];
+  const audioEnd = Number.isFinite(audio.duration) ? audio.duration : Infinity;
+  let nextValue = Math.max(0, Math.min(value, audioEnd));
+
+  if (field === 'start') {
+    nextValue = Math.min(nextValue, Math.max(0, seg.end - minDur));
+  } else {
+    nextValue = Math.max(nextValue, seg.start + minDur);
+    nextValue = Math.min(nextValue, audioEnd);
+  }
+
+  seg[field] = Number(nextValue.toFixed(3));
+  updateTimingDisplay(idx);
+  updateSegStatus(idx);
+  updateProgress();
+}
+
+function updateTimingDisplay(idx) {
+  const seg = state.segments[idx];
+  const segEl = document.getElementById('seg-' + idx);
+  if (!segEl) return;
+  const timeBtn = segEl.querySelector('.seg-time');
+  const durEl = segEl.querySelector('.seg-dur');
+  const startInput = segEl.querySelector('.time-input[data-field="start"]');
+  const endInput = segEl.querySelector('.time-input[data-field="end"]');
+  if (timeBtn) timeBtn.textContent = fmt(seg.start);
+  if (durEl) durEl.textContent = Math.max(0, seg.end - seg.start).toFixed(1) + 's';
+  if (startInput) {
+    startInput.value = seg.start.toFixed(2);
+    startInput.classList.remove('time-error');
+  }
+  if (endInput) {
+    endInput.value = seg.end.toFixed(2);
+    endInput.classList.remove('time-error');
+  }
 }
 
 /* -- AUDIO -- */
